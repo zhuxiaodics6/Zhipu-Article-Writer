@@ -5,7 +5,7 @@ def zhipu(tittle,api_key):
     # 初始化ZhipuAI客户端
     client = ZhipuAI(api_key=api_key)
     model = var.get()
-    print(model)
+    print('开始生成，使用模型：'+model)
     # 配置工具
     tools = [{
         "type": "web_search",
@@ -32,7 +32,10 @@ def zhipu(tittle,api_key):
 
     # 获取第一次输出的内容
     initial_output = response1.choices[0].message.content
+    print('第一次生成结果：')
     print(response1.choices[0].message.content)
+    print('---------')
+    print('开始第二轮优化')
 
     # 为优化作文准备新的提示词和消息
     optimization_prompt = f"你已经写了一篇文章，内容如下：{initial_output}请根据以下反馈对文章进行优化，确保文章包含更多真实事例和古代诗词或典故，事例不得自己捏造，如果不确定可以使用搜索功能进行查找，提高文章质量。"
@@ -60,7 +63,7 @@ def zhipu(tittle,api_key):
 
     # 打印优化后的作文内容
     
-    print('---------')
+    print('第二次生成结果：')
     print(response2.choices[0].message.content)
     return(response2.choices[0].message.content)
 
