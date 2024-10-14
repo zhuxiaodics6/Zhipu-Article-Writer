@@ -4,7 +4,8 @@ from zhipuai import ZhipuAI
 def zhipu(tittle,api_key):
     # 初始化ZhipuAI客户端
     client = ZhipuAI(api_key=api_key)
-
+    model = var.get()
+    print(model)
     # 配置工具
     tools = [{
         "type": "web_search",
@@ -23,7 +24,7 @@ def zhipu(tittle,api_key):
 
     # 第一次生成作文内容
     response1 = client.chat.completions.create(
-        model='glm-4-plus',
+        model=model,
         messages=messages,
         tools=tools,
         temperature=0.75
@@ -31,6 +32,7 @@ def zhipu(tittle,api_key):
 
     # 获取第一次输出的内容
     initial_output = response1.choices[0].message.content
+    print(response1.choices[0].message.content)
 
     # 为优化作文准备新的提示词和消息
     optimization_prompt = f"你已经写了一篇文章，内容如下：{initial_output}请根据以下反馈对文章进行优化，确保文章包含更多真实事例和古代诗词或典故，事例不得自己捏造，如果不确定可以使用搜索功能进行查找，提高文章质量。"
@@ -50,14 +52,14 @@ def zhipu(tittle,api_key):
 
     # 第二次生成优化后的作文内容
     response2 = client.chat.completions.create(
-        model='glm-4-plus',
+        model=model,
         messages=optimization_messages,
         tools=tools,
         temperature=0.75
     )
 
     # 打印优化后的作文内容
-    print(response1.choices[0].message.content)
+    
     print('---------')
     print(response2.choices[0].message.content)
     return(response2.choices[0].message.content)
@@ -68,23 +70,31 @@ def button_click():
         messagebox.showwarning('警告','请输入密钥')
         return 0
     text_in = text_input.get("1.0","end")
-    result = zhipu(text_in)
+    result = zhipu(text_in,auth_key)
     text_out = result
     text_output.delete(0.0,tk.END)
     text_output.insert(tk.INSERT,text_out)
     text_output.update
 
 root = tk.Tk()
+root.resizable(False, False)
 root.title("高中作文小工具alpha0.1")
-root.geometry("600x600")
-text_input = tk.Text(root,width=500,height=20)
-text_paikey = tk.Text(root,width=500,height=2)
+root.geometry("600x650")
+text_paikey = tk.Text(root,width=83,height=2)
+text_paikey.grid(row=0, column=0, padx=5, pady=4, sticky=tk.W,columnspan=5)
+text_input = tk.Text(root,width=83,height=20)
+text_input.grid(row=1, column=0, padx=5, pady=4, sticky=tk.W,columnspan=5)
 button = tk.Button(root, text="开始生成", command=button_click)
-text_output = tk.Text(root,width=500,height=20)
+button.grid(row=2, column=1, padx=5, pady=4, sticky=tk.W)
+var = tk.StringVar()
+var.set("glm-4-flash")
+choice1 = tk.Radiobutton(root, text="glm-4-plus", variable=var, value="glm-4-plus")
+choice1.grid(row=2, column=2, padx=5, pady=4, sticky=tk.W)
+choice2 = tk.Radiobutton(root, text="glm-4-flash", variable=var, value="glm-4-flash")
+choice2.grid(row=2, column=3, padx=5, pady=4, sticky=tk.W)
+text_output = tk.Text(root,width=83,height=20)
+text_output.grid(row=3, column=0, padx=5, pady=4, sticky=tk.W,columnspan=5)
 
-text_paikey.pack()
-text_input.pack()
-button.pack()
-text_output.pack()
+
 
 root.mainloop()
