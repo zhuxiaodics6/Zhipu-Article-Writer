@@ -1,7 +1,10 @@
 import tkinter as tk
 from tkinter import messagebox
+import asyncio
+import threading
 from typing import Optional
 from zhipuai import ZhipuAI
+from functools import partial
 
 class ArticleGenerator:
     """作文生成器类，处理与智谱AI的交互"""
@@ -13,7 +16,7 @@ class ArticleGenerator:
             "web_search": {"enable": True}
         }]
         
-    def generate_article(self, title: str, model: str) -> Optional[str]:
+    async def generate_article(self, title: str, model: str) -> Optional[str]:
         """生成并优化作文"""
         initial_prompt = "你现在是一个中国的高二学生，正在完成本周的语文议论文写作作业。文章需要有实际事例，内容完整连贯符合高考作文标准，不要出现分点。多运用古代诗词或者典故文章更受人喜欢，可以使用搜索功能查找相关内容，作文写的好有助于更高的得分。"
         
@@ -25,7 +28,9 @@ class ArticleGenerator:
         ]
         
         try:
-            response1 = self.client.chat.completions.create(
+            # 使用asyncio.to_thread将同步API调用转换为异步
+            response1 = await asyncio.to_thread(
+                self.client.chat.completions.create,
                 model=model,
                 messages=messages,
                 tools=self.tools,
@@ -45,7 +50,8 @@ class ArticleGenerator:
                 {"role": "user", "content": f"你写的文章已经非常好了，但是仍然有一点点的小问题需要优化,首先不要有自身的的事例，全部事例都要是可查的，语言要流畅不要有首先然后这种过于刻意的连词，这里是高考议论文的改卷标准，参考改卷要求对你自己写的文章进行优化调整，确保文章包含更多真实事例和古代诗词或典故，事例不得自己捏造，如果不确定可以使用搜索功能进行查找，提高文章质量。相信你可以做到的。高考改卷标准：{self.GRADING_STANDARD}"}
             ]
             
-            response2 = self.client.chat.completions.create(
+            response2 = await asyncio.to_thread(
+                self.client.chat.completions.create,
                 model=model,
                 messages=optimization_messages,
                 tools=self.tools,
@@ -78,6 +84,10 @@ class ArticleWriterGUI:
         self.root.resizable(False, False)
         self.setup_gui()
         
+        # 创建事件循环
+        self.loop = asyncio.new_event_loop()
+        self.thread = None
+        
     def setup_gui(self):
         """设置GUI界面元素"""
         # API密钥输入框
@@ -102,26 +112,65 @@ class ArticleWriterGUI:
         # 输出框
         self.text_output = tk.Text(self.root, width=83, height=20)
         self.text_output.grid(row=3, column=0, padx=5, pady=4, sticky=tk.W, columnspan=5)
+        
+        # 添加状态标签
+        self.status_label = tk.Label(self.root, text="就绪")
+        self.status_label.grid(row=2, column=0, padx=5, pady=4, sticky=tk.W)
     
-    def generate_article(self):
-        """处理生成按钮点击事件"""
+    def update_status(self, text: str):
+        """更新状态标签"""
+        self.status_label.config(text=text)
+        self.root.update()
+
+    async def async_generate_article(self):
+        """异步生成文章"""
         api_key = self.text_apikey.get("1.0", "end").strip()
         if not api_key:
             messagebox.showwarning('警告', '请输入密钥')
             return
             
         title = self.text_input.get("1.0", "end")
-        generator = ArticleGenerator(api_key)
-        result = generator.generate_article(title, self.model_var.get())
+        self.generate_button.config(state=tk.DISABLED)
+        self.update_status("正在生成中...")
         
-        if result:
-            self.text_output.delete("1.0", tk.END)
-            self.text_output.insert(tk.INSERT, result)
-            self.text_output.update()
+        try:
+            generator = ArticleGenerator(api_key)
+            result = await generator.generate_article(title, self.model_var.get())
+            
+            if result:
+                self.text_output.delete("1.0", tk.END)
+                self.text_output.insert(tk.INSERT, result)
+        finally:
+            self.generate_button.config(state=tk.NORMAL)
+            self.update_status("生成完成")
+    
+    def start_async_generation(self):
+        """启动异步生成过程"""
+        if self.thread and self.thread.is_alive():
+            return
+            
+        async def run_async():
+            await self.async_generate_article()
+            
+        def run_in_thread():
+            asyncio.set_event_loop(self.loop)
+            self.loop.run_until_complete(run_async())
+            
+        self.thread = threading.Thread(target=run_in_thread, daemon=True)
+        self.thread.start()
+    
+    def generate_article(self):
+        """处理生成按钮点击事件"""
+        self.start_async_generation()
     
     def run(self):
         """启动GUI程序"""
         self.root.mainloop()
+        
+    def __del__(self):
+        """清理事件循环"""
+        if self.loop and not self.loop.is_closed():
+            self.loop.close()
 
 if __name__ == "__main__":
     app = ArticleWriterGUI()
