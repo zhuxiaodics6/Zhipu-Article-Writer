@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import tkinter as tk
 from tkinter import messagebox
 import asyncio
@@ -28,13 +29,16 @@ class ArticleGenerator:
         ]
         
         try:
-            # 使用asyncio.to_thread将同步API调用转换为异步
-            response1 = await asyncio.to_thread(
-                self.client.chat.completions.create,
-                model=model,
-                messages=messages,
-                tools=self.tools,
-                temperature=0.75
+            loop = asyncio.get_event_loop()
+            response1 = await loop.run_in_executor(
+                None,
+                partial(
+                    self.client.chat.completions.create,
+                    model=model,
+                    messages=messages,
+                    tools=self.tools,
+                    temperature=0.75
+                )
             )
             initial_output = response1.choices[0].message.content
             
@@ -48,14 +52,16 @@ class ArticleGenerator:
                 {"role": "assistant", "content": initial_output},
                 {"role": "user", "content": optimization_prompt},
                 {"role": "user", "content": f"你写的文章已经非常好了，但是仍然有一点点的小问题需要优化,首先不要有自身的的事例，全部事例都要是可查的，语言要流畅不要有首先然后这种过于刻意的连词，这里是高考议论文的改卷标准，参考改卷要求对你自己写的文章进行优化调整，确保文章包含更多真实事例和古代诗词或典故，事例不得自己捏造，如果不确定可以使用搜索功能进行查找，提高文章质量。相信你可以做到的。高考改卷标准：{self.GRADING_STANDARD}"}
-            ]
-            
-            response2 = await asyncio.to_thread(
-                self.client.chat.completions.create,
-                model=model,
-                messages=optimization_messages,
-                tools=self.tools,
-                temperature=0.75
+                ]         
+            response2 = await loop.run_in_executor(
+                None,
+                partial(
+                    self.client.chat.completions.create,
+                    model=model,
+                    messages=optimization_messages,
+                    tools=self.tools,
+                    temperature=0.75
+                )
             )
             
             return response2.choices[0].message.content
